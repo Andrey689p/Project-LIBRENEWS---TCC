@@ -4,6 +4,30 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Garantir que a conexão com o banco esteja disponível
+if (!isset($pdo)) {
+    require_once __DIR__ . '/../config/database.php';
+}
+
+// Buscar categorias para o dropdown dinâmico
+$categoriasMenu = [];
+try {
+    $stmtNavbarCategorias = $pdo->query("SELECT Idcategoria, nomecategoria FROM Categoria ORDER BY nomecategoria ASC");
+    $categoriasMenu = $stmtNavbarCategorias->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // Mantém array vazio em caso de erro para evitar quebra na navbar
+    $categoriasMenu = [];
+}
+
+// Metadados auxiliares para ícones e descrições
+$metaCategoriasNavbar = [
+    'Desenvolvimento' => ['descricao' => 'Web, Mobile e mais', 'icone' => 'bi-code-slash'],
+    'Programação' => ['descricao' => 'Linguagens e frameworks', 'icone' => 'bi-terminal'],
+    'Tecnologia' => ['descricao' => 'Hardware e inovação', 'icone' => 'bi-cpu'],
+    'Sistemas' => ['descricao' => 'DevOps e infraestrutura', 'icone' => 'bi-hdd-network'],
+    'Mercado' => ['descricao' => 'Tendências e carreiras', 'icone' => 'bi-graph-up-arrow'],
+];
+
 // Verificar se usuário está logado
 $isLoggedIn = isset($_SESSION['user_id']);
 $userType = $_SESSION['user_type'] ?? null;
@@ -126,27 +150,38 @@ $dataFormatada = sprintf(
                         </a>
 
                         <div class="dropdown-menu dropdown-menu-modern-style rounded-4 shadow-lg">
-<?php
-$categoriasMenu = [
-    ['Desenvolvimento', 'Web, Mobile e mais', 'bi-code-slash'],
-    ['Programação', 'Linguagens e frameworks', 'bi-terminal'],
-    ['Tecnologia', 'Hardware e inovação', 'bi-cpu'],
-    ['Sistemas', 'DevOps e infraestrutura', 'bi-hdd-network'],
-    ['Mercado', 'Tendências e carreiras', 'bi-graph-up-arrow'],
-];
-
-foreach ($categoriasMenu as $cat):
-?>
-    <a href="#" class="dropdown-item dropdown-item-modern-style">
+<?php if (!empty($categoriasMenu)): ?>
+    <?php foreach ($categoriasMenu as $cat):
+        $nomeCat = htmlspecialchars($cat['nomecategoria']);
+        $descricaoCat = $metaCategoriasNavbar[$cat['nomecategoria']]['descricao'] ?? 'Principais notícias';
+        $iconeCat = $metaCategoriasNavbar[$cat['nomecategoria']]['icone'] ?? 'bi-newspaper';
+        $categoriaUrl = "/LibreNews/index.php?categoria=" . intval($cat['Idcategoria']);
+    ?>
+        <a 
+            href="<?= $categoriaUrl ?>" 
+            data-category-url="<?= $categoriaUrl ?>" 
+            class="dropdown-item dropdown-item-modern-style"
+        >
+            <div class="dropdown-icon-modern rounded-circle">
+                <i class="bi <?= $iconeCat ?>"></i>
+            </div>
+            <div>
+                <div class="dropdown-title-modern"><?= $nomeCat ?></div>
+                <small class="dropdown-subtitle-modern"><?= $descricaoCat ?></small>
+            </div>
+        </a>
+    <?php endforeach; ?>
+<?php else: ?>
+    <div class="dropdown-item dropdown-item-modern-style disabled">
         <div class="dropdown-icon-modern rounded-circle">
-            <i class="bi <?= $cat[2] ?>"></i>
+            <i class="bi bi-info-circle"></i>
         </div>
         <div>
-            <div class="dropdown-title-modern"><?= $cat[0] ?></div>
-            <small class="dropdown-subtitle-modern"><?= $cat[1] ?></small>
+            <div class="dropdown-title-modern">Categorias indisponíveis</div>
+            <small class="dropdown-subtitle-modern">Tente novamente em instantes</small>
         </div>
-    </a>
-<?php endforeach; ?>
+    </div>
+<?php endif; ?>
 
                         </div>
                     </div>
@@ -393,6 +428,17 @@ document.addEventListener('DOMContentLoaded', function() {
         hoverTimeout = setTimeout(() => {
             closeDropdown();
         }, 200);
+    });
+
+    // Garante que o clique em uma categoria navegue corretamente
+    dropdownMenu.querySelectorAll('[data-category-url]').forEach(link => {
+        link.addEventListener('click', function(event) {
+            const url = this.getAttribute('data-category-url');
+            if (url) {
+                event.preventDefault();
+                window.location.href = url;
+            }
+        });
     });
 });
 </script>
